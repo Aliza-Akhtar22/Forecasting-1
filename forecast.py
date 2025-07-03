@@ -8,7 +8,7 @@ def dynamic_forecast(db, table_name, ds_col, y_col, regressor_cols, growth_rates
     query = f"SELECT {', '.join(selected_columns)} FROM {table_name}"
     df = pd.read_sql(text(query), db.bind)
 
-    # Step 2: Preprocess
+    
     df = df.dropna(subset=[ds_col, y_col] + regressor_cols)
     df[ds_col] = pd.to_datetime(df[ds_col], dayfirst=True)
     df.rename(columns={ds_col: "ds", y_col: "y"}, inplace=True)
