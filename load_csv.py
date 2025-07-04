@@ -44,7 +44,7 @@ def load_csv_to_db():
         )
         db.add(data)
 
-    # Commit all at once
+    
     db.commit()
     db.close()
 
