@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from forecast_service import run_forecast  # <-- remove 'services.'
+from forecast_service import run_forecast 
 
 router = APIRouter()
 
