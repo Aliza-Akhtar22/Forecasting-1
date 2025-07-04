@@ -1,11 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
 from sqlalchemy import inspect
-from sqlalchemy.orm import Session
-from database import SessionLocal, engine
-from forecast import dynamic_forecast
+from database import engine
+from forecast_router import router as forecast_router
 
 app = FastAPI()
 
@@ -17,16 +14,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-class ForecastRequest(BaseModel):
-    table_name: str
-    period: int
-    ds_column: str
-    y_column: str
-    regressors: List[str]
-    growth_rates: List[float]
-
-
+# API router
+app.include_router(forecast_router, prefix="/api")
 
 @app.get("/tables")
 def get_tables():
@@ -41,23 +30,3 @@ def get_columns(table_name: str):
         return {"columns": [col["name"] for col in columns]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/forecast")
-def forecast_from_db(req: ForecastRequest):
-    db: Session = SessionLocal()
-    try:
-        result_df = dynamic_forecast(
-            db=db,
-            table_name=req.table_name.lower(),  
-            ds_col=req.ds_column,
-            y_col=req.y_column,
-            regressor_cols=req.regressors,
-            growth_rates=req.growth_rates,
-            period=req.period
-        )
-        result_df["ds"] = result_df["ds"].astype(str)
-        return {"forecast": result_df.to_dict(orient="records")}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
