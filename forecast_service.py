@@ -1,5 +1,6 @@
 from forecast import dynamic_forecast
 from rf_model import forecast_with_random_forest
+from xgb_model import forecast_with_xgboost  
 from sqlalchemy.orm import Session
 import pandas as pd
 from sqlalchemy import text
@@ -42,5 +43,16 @@ def run_forecast(
         )
         return result
 
+    elif model_type == "xgboost":  
+        result = forecast_with_xgboost(
+            df=df,
+            ds_col=ds_col,
+            y_col=y_col,
+            regressor_cols=regressor_cols,
+            growth_rates=growth_rates,
+            period=period
+        )
+        return result
+
     else:
-        raise ValueError("Invalid model_type. Choose 'prophet' or 'random_forest'.")
+        raise ValueError("Invalid model_type. Choose 'prophet', 'random_forest', or 'xgboost'.")
