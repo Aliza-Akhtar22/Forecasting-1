@@ -4,8 +4,17 @@ from xgb_model import forecast_with_xgboost
 from sqlalchemy.orm import Session
 import pandas as pd
 from sqlalchemy import text
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
 import numpy as np
+
+
+def mean_absolute_percentage_error(y_true, y_pred):
+    """Handle zero values in y_true gracefully."""
+    y_true, y_pred = np.array(y_true), np.array(y_pred)
+    non_zero = y_true != 0
+    if not np.any(non_zero):
+        return np.inf 
+    return np.mean(np.abs((y_true[non_zero] - y_pred[non_zero]) / y_true[non_zero])) * 100
 
 
 def run_forecast(
@@ -18,12 +27,11 @@ def run_forecast(
     growth_rates: list,
     period: int
 ):
-    
     query = f"SELECT {ds_col}, {y_col}, {', '.join(regressor_cols)} FROM {table_name}"
     df = pd.read_sql(text(query), db.bind)
 
     if model_type == "prophet":
-        result = dynamic_forecast(
+        return dynamic_forecast(
             db=db,
             table_name=table_name,
             ds_col=ds_col,
@@ -32,10 +40,9 @@ def run_forecast(
             growth_rates=growth_rates,
             period=period
         )
-        return result
 
     elif model_type == "random_forest":
-        result = forecast_with_random_forest(
+        return forecast_with_random_forest(
             df=df,
             ds_col=ds_col,
             y_col=y_col,
@@ -43,10 +50,9 @@ def run_forecast(
             growth_rates=growth_rates,
             period=period
         )
-        return result
 
     elif model_type == "xgboost":
-        result = forecast_with_xgboost(
+        return forecast_with_xgboost(
             df=df,
             ds_col=ds_col,
             y_col=y_col,
@@ -54,7 +60,6 @@ def run_forecast(
             growth_rates=growth_rates,
             period=period
         )
-        return result
 
     else:
         raise ValueError("Invalid model_type. Choose 'prophet', 'random_forest', or 'xgboost'.")
@@ -76,11 +81,16 @@ def evaluate_models(
     df[ds_col] = pd.to_datetime(df[ds_col], dayfirst=True)
     df = df.sort_values(ds_col)
 
-    
     train_df = df.iloc[:-period]
     test_df = df.iloc[-period:]
 
     results = {}
+
+    def compute_metrics(y_true, y_pred):
+        return {
+            "mae": mean_absolute_error(y_true, y_pred),
+            "mape": mean_absolute_percentage_error(y_true, y_pred)
+        }
 
     # Prophet
     try:
@@ -95,10 +105,10 @@ def evaluate_models(
             growth_rates=growth_rates,
             period=period
         )
-        rmse_prophet = np.sqrt(mean_squared_error(test_df[y_col], prophet_forecast["yhat"]))
-        results["prophet"] = rmse_prophet
+        metrics = compute_metrics(test_df[y_col], prophet_forecast["yhat"])
+        results["prophet"] = metrics
     except Exception as e:
-        results["prophet"] = f"Error: {str(e)}"
+        results["prophet"] = {"error": str(e)}
 
     # Random Forest
     try:
@@ -110,10 +120,10 @@ def evaluate_models(
             growth_rates=growth_rates,
             period=period
         )
-        rmse_rf = np.sqrt(mean_squared_error(test_df[y_col], rf_forecast["yhat"]))
-        results["random_forest"] = rmse_rf
+        metrics = compute_metrics(test_df[y_col], rf_forecast["yhat"])
+        results["random_forest"] = metrics
     except Exception as e:
-        results["random_forest"] = f"Error: {str(e)}"
+        results["random_forest"] = {"error": str(e)}
 
     # XGBoost
     try:
@@ -125,16 +135,16 @@ def evaluate_models(
             growth_rates=growth_rates,
             period=period
         )
-        rmse_xgb = np.sqrt(mean_squared_error(test_df[y_col], xgb_forecast["yhat"]))
-        results["xgboost"] = rmse_xgb
+        metrics = compute_metrics(test_df[y_col], xgb_forecast["yhat"])
+        results["xgboost"] = metrics
     except Exception as e:
-        results["xgboost"] = f"Error: {str(e)}"
+        results["xgboost"] = {"error": str(e)}
 
-    # Determining the best model
-    numeric_errors = {k: v for k, v in results.items() if isinstance(v, (int, float))}
-    best_model = min(numeric_errors, key=numeric_errors.get) if numeric_errors else "None"
+    # Determine best model based on MAE
+    valid_models = {k: v for k, v in results.items() if isinstance(v, dict) and "mae" in v}
+    best_model = min(valid_models, key=lambda k: valid_models[k]["mae"]) if valid_models else "None"
 
     return {
-        "rmse_scores": results,
+        "evaluation_metrics": results,
         "recommended_model": best_model
     }
