@@ -13,7 +13,7 @@ def mean_absolute_percentage_error(y_true, y_pred):
     y_true, y_pred = np.array(y_true), np.array(y_pred)
     non_zero = y_true != 0
     if not np.any(non_zero):
-        return np.inf 
+        return np.inf  
     return np.mean(np.abs((y_true[non_zero] - y_pred[non_zero]) / y_true[non_zero])) * 100
 
 
@@ -140,7 +140,7 @@ def evaluate_models(
     except Exception as e:
         results["xgboost"] = {"error": str(e)}
 
-    # Determine best model based on MAE
+    # Determining best model based on MAE
     valid_models = {k: v for k, v in results.items() if isinstance(v, dict) and "mae" in v}
     best_model = min(valid_models, key=lambda k: valid_models[k]["mae"]) if valid_models else "None"
 
