@@ -4,7 +4,7 @@ from database import Base
 
 # Table for eCourts_data.csv
 class CourtData(Base):
-    __tablename__ = "eCourts_data"
+    __tablename__ = "courts_data"
 
     id = Column(Integer, primary_key=True, index=True)
     ds = Column(String, nullable=False)  # Date as string; will parse in code
